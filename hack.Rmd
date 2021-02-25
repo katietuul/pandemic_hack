@@ -1,0 +1,609 @@
+---
+title: "Влияние пандемии на рынок труда: гендерный кейс"
+author: "команда crazycatato"
+output: 
+  html_document: 
+    code_folding: hide
+    theme: paper
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+```
+
+```{r, eval = TRUE}
+library(readr)
+library(dplyr)
+library(tidytext)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(kableExtra)
+
+"analyst" <- c("Екатерина Тулубенская", "Анастасия Молотова", "Анастасия Бахарева")
+"work" <- c("Random Forests, Visualizations", "Analytics, texts", "Logistic Regression & Bayesian belief network")
+
+as.data.frame(`analyst`, `work`) %>% kable %>% kable_styling()
+
+```
+
+# **Глава 1: влияние COVID-19 на безработицу**
+
+```{r}
+
+data_new = read_delim("unemployed_1_data.csv", delim = ";")
+
+```
+
+Эпидемия вируса COVID-19 оказала существенное негативное влияние на сектор экономики в
+России. По данным из ежегодного отчета бизнес-омбудсмена Бориса Титова президенту Владимиру
+Путину, за период пандемии (март-ноябрь 2020 года) свою деятельность приостановили 35,7 %
+компаний, а на пике карантина не работало 56,1% организаций (Уполномоченный при Президенте РФ
+по защите прав предпринимателей. Доклад Президенту РФ — 2020).
+
+```{r}
+
+data_new$jobless = ifelse(data_new$jobless_category != "None", 1, 0)
+
+```
+
+Результатом обвала сектора экономики стал и крах рынка труда. По данным Росстата, в мае 2020 количество безработных в стране выросло на 4,5 миллиона, то есть уровень безработицы достиг 6,1% всей рабочей силы, хотя еще в марте он составлял 5,8% (Безработица в России выросла до максимума за восемь лет). В 2020 году уровень безработицы впервые достиг максимума с 2012 года.
+
+Мы решили начать с простого и посмотреть, как распределяется безработица по России. График 1 показывает, в каких регионах увольняются в период пандемии чаще всего, можно увидеть, что Москва имеет значительный отрыв от других городов: там увольнялись больше всего. В этом контексте нельзя не упомянуть и про регионы: в среднем женщины более безработные, чем мужчины, самый большой процент безработных женщин находится в столицах, самый маленький - в республиках
+
+<center>![](gr1.png)</center>
+
+```{r}
+
+library(scales)
+
+df_graph =
+  data_new2 %>%
+  filter(jobless == 1) %>%
+  filter(n>100000) %>%
+  ggplot(aes(x=as.factor(region), fill=as.factor(gender)))+
+  geom_bar(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..]), position="fill") +
+  geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..])), stat="count", position = position_stack(vjust = 0.5))+
+  labs(title = "Количество безработных по регионам", x = "Регион", y = "Проценты", fill = "Пол") +
+  scale_y_continuous(labels = scales::percent)+
+  scale_fill_manual(values = c("skyblue", "#EBA286")) +
+  theme_classic()+
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent)
+
+
+df_graph
+
+# ggsave(df_graph, file="df_graph.jpg")
+
+```
+ 
+
+Изучая помесячную динамику найма и увольнений сотрудников, которая изображена на
+графиках ниже, мы можем сделать вывод о том, что в период пандемии (весна-осень 2020) женщины
+теряли работу в бóльшем количестве, чем мужчины (см. График 2). В то же время заметен общий тренд:
+весной было уволено достаточно много сотрудников, но часть из них впоследствие находила работу.
+
+<center>![](gr2.jpg)</center>
+
+```{r}
+
+library(dplyr)
+library(lubridate)
+
+df_unemp = data_new %>% 
+  group_by(month_unemployed, gender) %>% 
+  count(gender)
+
+plot1 = df_unemp %>%
+  filter(month_unemployed != "None") %>%
+  ggplot(aes(x = month_unemployed, y = n, group = gender)) +
+  geom_line(aes(color = gender))+
+  geom_point(aes(color = gender), size = 3) +
+  geom_text(aes(label=n), nudge_x = 0, nudge_y = 2, check_overlap = T, size = 3) +
+  labs(title="Количество уволенных в разные месяцы",
+      color = "Пол",
+      x = NULL,
+      y = NULL) +
+  theme_classic()
+
+# ggsave(plot1, file="plot1.jpg")
+       
+```
+
+Причиной огромного количества увольнений женщин (более 530 тысяч случаев против 415 тысяч мужчин) может являться то, что большинство женщин изначально трудится на низкооплачиваемых ставках, которые проще всего сократить (Sullivan, 2019).
+
+Очевидно, что из-за пандемии положение женщин на рынке труда стало еще более хрупким. Несмотря на то, что некоторые статьи называют ситуацию с женщинами на рынке труда довольно неоднозначной, чаще всего находятся определенные следы наличия профессиональной сегрегации: женщины в среднем более безработны, чем мужчины, согласно статистике Global Employment Trends for Women 2004. Осложнить их положение на рынке труда может и наличие ребенка, особенно в раннем возрасте. (Нью - Йорк: Организация Объединенных & Наций, 2005). В литературе много обсуждался вопрос и заработной платы, поэтому в данном проекте была рассмотрена разница в средних значениях зарплат по отраслям в зависимости от пола. Оказалось, что мужчины в целом работают либо на руководящих должностях, либо на профессиях, которые требуют физической силы, в то время как женщины традиционно представляют торговлю. Из графиков также видно, что мужчины в среднем получают ощутимо бóльшую заработную плату по сравнению с женщинами (см.График 3).
+
+<center>![](gr3.jpg)</center>
+
+```{r}
+
+educ = data_new %>%
+  mutate(out = 
+           case_when(
+             data_new$profession_employment == "None" ~ 0,
+             data_new$month_employment == "None" ~ 0,
+             data_new$week_employment == "None" ~ 0,
+             TRUE ~ 1
+           )
+  )
+
+educ = educ %>%
+  filter(hc_finisheducczn == TRUE & out == 1 & profession_last_work != "ANONYMIZATION" & profession_last_work != "None")
+
+nnwork = educ %>%
+  group_by(gender) %>%
+  count(profession_last_work)
+
+nnwork$profession_last_work[120] = "Сотрудник ДОУ"
+nnwork$profession_last_work[2] = "Администратор"
+
+work_n = data_new %>% 
+  filter(salary_average != "None", profession_last_work != "ANONYMIZATION" & profession_last_work != "None")
+
+work_n$salary_average = as.numeric(work_n$salary_average)
+work_nn = work_n %>%
+  group_by(gender, profession_last_work) %>%
+  count(mean(salary_average))
+
+names(work_nn)[names(work_nn) == 'mean(salary_average)'] <- 'mean_salary_average'
+
+work_nn = as.data.frame(work_nn)
+work_nn$mean_salary_average = as.numeric(work_nn$mean_salary_average)
+work_nn$n = as.numeric(work_nn$n)
+work_nn = work_nn %>%
+  filter(n > 1000)
+
+work_nn_women = work_nn %>%
+  filter(gender == "Женский")
+
+work_nn_men = work_nn %>%
+  filter(gender == "Мужской")
+
+work_nn_full = inner_join(work_nn_women, work_nn_men, by = c("profession_last_work" = "profession_last_work"))
+work_nn_full$diff = work_nn_full$mean_salary_average.y - work_nn_full$mean_salary_average.x
+
+work_nn_full$profession_last_work[1] = "Агент"
+work_nn_full$profession_last_work[2] = "Администратор"
+work_nn_full$profession_last_work[3] = "Аппаратчик"
+work_nn_full$profession_last_work[72] = "Экономист"
+work_nn_full$profession_last_work[10] = "Директор розничной торговли"
+work_nn_full$profession_last_work[11] = "Директор филиала"
+work_nn_full$profession_last_work[13] = "Директор: эконом.сфера"
+work_nn_full$profession_last_work[37] = "Мерчендайзер"
+work_nn_full$profession_last_work[41] = "Начальник подразделения"
+work_nn_full$profession_last_work[46] = "Оператор линии в пищ.продукции"
+work_nn_full$profession_last_work[58] = "Руководитель группы"
+
+gg1 = work_nn_full %>%
+  top_n(20, diff) %>%
+  ggplot(aes(diff, reorder(profession_last_work, diff), fill = diff > 0)) +
+  scale_fill_manual(values = c("skyblue")) +
+  geom_col(show.legend = FALSE) +
+  labs(y = NULL,
+       x = NULL,
+       title = "Разница в средних значениях зарплат",
+       subtitle = "в пользу мужчин")+
+    theme_classic()
+
+work_nn_full2 = inner_join(work_nn_women, work_nn_men, by = c("profession_last_work" = "profession_last_work"))
+work_nn_full2$diff = work_nn_full2$mean_salary_average.x - work_nn_full$mean_salary_average.y
+
+work_nn_full2$profession_last_work[1] = "Агент"
+work_nn_full2$profession_last_work[2] = "Администратор"
+work_nn_full2$profession_last_work[3] = "Аппаратчик"
+work_nn_full2$profession_last_work[72] = "Экономист"
+work_nn_full2$profession_last_work[10] = "Директор розничной торговли"
+work_nn_full2$profession_last_work[11] = "Директор филиала"
+work_nn_full2$profession_last_work[13] = "Директор: эконом.сфера"
+work_nn_full2$profession_last_work[37] = "Мерчендайзер"
+work_nn_full2$profession_last_work[41] = "Начальник подразделения"
+work_nn_full2$profession_last_work[46] = "Оператор линии в пищ.продукции"
+work_nn_full2$profession_last_work[58] = "Руководитель группы"
+
+gg2 = work_nn_full2 %>%
+  filter(diff>0) %>%
+  top_n(20, diff) %>%
+  ggplot(aes(diff, reorder(profession_last_work, diff), fill = diff > 0)) +
+  scale_fill_manual(values = c("#EBA286")) +
+  geom_col(show.legend = FALSE) +
+  labs(y = NULL,
+       x = NULL,
+       title = "Разница в средних значениях зарплат",
+       subtitle = "в пользу женщиин")+
+  xlim(0,15000)+
+  theme_classic()
+
+plot4 = ggarrange(gg1, gg2, widths = c(15,15))
+
+# ggsave(plot4, file="plot4.jpg", width = 15)
+
+data_new2 = data_new %>% group_by(region) %>% add_tally()
+empl2 = data_new2 %>% 
+  filter(jobless == 1) %>%
+  filter(n>100000) %>% 
+  ggplot(aes(x = as.factor(region), y = n, fill = as.factor(gender)))+
+  geom_bar(stat = "identity", position="fill")+
+  geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..])), stat="count", position = position_stack(vjust = 0.5))+
+  labs(title = "Где чаще увольняются и кто?", x="Регион", y = "Количество увольнений", subtitle = "В Чеченской Республике мужчины увольняются значительно чаще", fill = "Пол")+
+  theme_classic()+
+  scale_fill_manual(values = c("#87CEEB", "#EBA286")) +
+  coord_flip()
+
+empl2
+
+ggsave(empl2, file="empl2.jpg", width = 15)
+
+```
+
+Сравнение распределения зарплат по различным областям показало, что на Российском рынке наблюдается ощутимое неравенство, и в среднем женщины получают меньшую зарплату, нежели мужчины. В некоторых областях, например, в программировании, также больше мужчин, получающих 1 миллион и выше, чем женщин с аналогичным заработком. Для сравнения средних значений были использованы не только имеющиеся данные Роструда, но и статистика от Росстата. Средние значения по данным Роструда отмечены красной линией, Росстата - синей (см. График 4). Видно, что значения разнятся, что обусловлено различиями в выборке.
+
+<center>![](empl.jpg)</center>
+<center>![](empl2.jpg)</center>
+<center>![](empl23.jpg)</center>
+<center>![](empl24.jpg)</center>
+
+```{r, fig.width=15}
+
+work_n$salary_average = as.numeric(work_n$salary_average)
+work_n = work_n %>% mutate_if(is.character, as.factor)
+
+work_n = work_n %>% dplyr::select(profession_last_work,salary_average,gender)
+
+gg_hist = work_n %>%
+  filter(profession_last_work == "Уборщик" & salary_average > 1000) %>%
+  ggplot(aes(x = salary_average, y = ..count..)) +
+  geom_histogram(stat="count") +
+  labs(y = NULL,
+       x = NULL,
+       title = "Средние зарплаты по отраслям: Уборщик",
+       subtitle = "согласно Росстату, средняя зарплата мужчин - 40385, женщин - 32828")+
+  facet_wrap(~gender) +
+  geom_vline(aes(xintercept = mean(salary_average), linetype = "mean"), size = 1, color = c("red")) +
+  scale_fill_manual(values = c("#FF5D00", "skyblue")) +
+  theme_classic()
+
+gg_hist2 = work_n %>%
+  filter(profession_last_work == "Продавец" & salary_average > 1000) %>%
+  ggplot(aes(x = salary_average, y = ..count..)) +
+  geom_histogram(stat="count") +
+  labs(y = NULL,
+       x = NULL,
+       title = "Средние зарплаты по отраслям: Продавец",
+       subtitle = "согласно Росстату, средняя зарплата мужчин - 52122, женщин - 41160")+
+  facet_wrap(~gender) +
+  geom_vline(aes(xintercept = mean(salary_average), linetype = "mean"), size = 1, color = c("red")) +
+  scale_fill_manual(values = c("#FF5D00", "skyblue")) +
+  theme_classic()
+
+gg_hist3 = work_n %>%
+  filter(profession_last_work == "Программист" & salary_average > 10000) %>%
+  ggplot(aes(x = salary_average, y = ..count..)) +
+  geom_histogram(stat="count") +
+  labs(y = NULL,
+       x = NULL,
+       title = "Средние зарплаты по отраслям: Программист",
+       subtitle = "согласно Росстату, средняя зарплата мужчин - 78980, женщин - 53887")+
+  facet_wrap(~gender) +
+  geom_vline(aes(xintercept = mean(salary_average), linetype = "mean"), size = 1, color = c("red")) +
+  scale_fill_manual(values = c("#FF5D00", "skyblue")) +
+  theme_classic()
+
+
+gg_hist4 = work_n %>%
+  filter(profession_last_work == "Руководитель проекта" & salary_average > 1000) %>%
+  ggplot(aes(x = salary_average, y = ..count..),binwidth = 1) +
+  geom_histogram(stat="count") +
+  labs(y = NULL,
+       x = NULL,
+       title = "Средние зарплаты по отраслям: Руководитель проекта",
+       subtitle = "согласно Росстату, средняя зарплата мужчин - 77719, женщин - 55187",
+       scale = "free")+
+  facet_wrap(~gender) +
+  geom_vline(aes(xintercept = mean(salary_average), linetype = "mean"), size = 1, color = c("red")) +
+  theme_classic()
+
+# ggsave(gg_hist4, file="empl24.jpg")
+
+```
+
+Причина такого положения женщин во время пандемии может быть в том, что кризис сильнее всего сказался на сферах деятельности, в которых традиционно работает больше женщин, чем мужчин, — то есть на ресторанном бизнесе и сфере услуг. По данным российской компании интернет-рекрутмента HeadHunter, в сравнении с 2019 годом количество резюме женщин в некоторых профессиональных областях выросло в разы — большинство заявительниц остались без работы и были вынуждены заново выйти на рынок труда.
+
+Все приведенные факты приводят к выводу, что женщины являются даже если не самой, то как минимум одной из самых уязвимых социальных групп, которые больше других ощутили на себе всю тягость последствий пандемии. Следовательно, нужно обратить внимание на женщин, которые хотят работать, но таковой возможности не имеют. Согласно последним данным Росстата, в России насчитывается 78,6 миллиона женщин, что составляет 53.57% от всего населения Российской Федерации (Росстат назвал соотношение числа мужчин и женщин в России), поэтому стабилизация положения женского населения страны на рынке труда могла бы существенно улучшить экономическую ситуацию в стране в целом.
+
+```{r}
+
+load("m0.rda")
+
+# install.packages("glmmTMB")
+library(sjPlot)
+library(glmmTMB)
+sjPlot::plot_model(m0, type= "re", sort.est = "sort.all", grid = F) + theme_classic()
+
+library(tree)
+library(MASS)
+library(randomForest)
+
+df_2 = data %>% filter(gender == "Женский")
+
+df_2 = df_2 %>% 
+  mutate(out = 
+           case_when(
+             df_2$profession_employment == "None" ~ 0,
+             df_2$month_employment == "None" ~ 0,
+             df_2$week_employment == "None" ~ 0,
+             TRUE ~ 1
+           )
+  )
+
+df_3 = df_2 %>% dplyr::select(-c("month_unemployed", "week_unemployed", 'hc_any', 'hc_repeat', 'hc_didnotwork', 'hc_predpens', 
+                              'hc_largefam', 'hc_finisheducczn', 'hc_divorced', 'hc_singleparent', 'hc_redundantworkers',
+                              'hc_socialcontr', 'jobless_category', 'month_jobless', 'month_end_busyness',"district", 'dismissal_reason', 
+                              'month_dismissal', 'work_napravl_refusal_number', 'work_refusal_number', 'month_employment',
+                              'week_employment', 'month_close', 'reason_close', 'month_end', 'reason_end', "age"))
+
+
+#save(data = "df_3", file = "df_out.rda")
+
+
+set.seed(1)
+
+
+df_3_sample = df_3 %>% dplyr::select(-c(id, gender))
+
+df_3_sample = df_3_sample %>% dplyr::select(education, year_graduation, experience, salary_average, educ_napravl, 
+                           education_speciality, prof_education_dur, work_napravl_number, employer_refusal_number, 
+                           expected_salary, employment_type, employment_mode, out)
+
+df_3_sample$education = ifelse(df_3_sample$education == "None", 0, df_3_sample$education)
+df_3_sample$year_graduation = ifelse(df_3_sample$year_graduation == "None", 0, df_3_sample$year_graduation)
+df_3_sample$experience = ifelse(df_3_sample$experience == "None", 0, df_3_sample$experience)
+df_3_sample$salary_average = ifelse(df_3_sample$salary_average == "None", 0, df_3_sample$salary_average)
+df_3_sample$educ_napravl = ifelse(df_3_sample$educ_napravl == "None", 0, df_3_sample$educ_napravl)
+df_3_sample$education_speciality = ifelse(df_3_sample$education_speciality == "None", 0, df_3_sample$education_speciality)
+df_3_sample$prof_education_dur = ifelse(df_3_sample$prof_education_dur == "None", 0, df_3_sample$prof_education_dur)
+df_3_sample$work_napravl_number = ifelse(df_3_sample$work_napravl_number == "None", 0, df_3_sample$work_napravl_number)
+df_3_sample$employer_refusal_number = ifelse(df_3_sample$employer_refusal_number == "None", 0, df_3_sample$employer_refusal_number)
+df_3_sample$expected_salary = ifelse(df_3_sample$expected_salary == "None", 0, df_3_sample$expected_salary)
+df_3_sample$employment_type = ifelse(df_3_sample$employment_type == "None", 0, df_3_sample$employment_type)
+df_3_sample$employment_mode = ifelse(df_3_sample$employment_mode == "None", 0, df_3_sample$employment_mode)
+
+df_3_sample$year_graduation = as.numeric(df_3_sample$year_graduation)
+df_3_sample$experience = as.numeric(df_3_sample$experience)
+df_3_sample$salary_average = as.numeric(df_3_sample$salary_average)
+df_3_sample$prof_education_dur = as.numeric(df_3_sample$prof_education_dur)
+df_3_sample$work_napravl_number = as.numeric(df_3_sample$work_napravl_number)
+df_3_sample$employer_refusal_number = as.numeric(df_3_sample$employer_refusal_number)
+df_3_sample$expected_salary = as.numeric(df_3_sample$expected_salary)
+df_3_sample$employment_mode = as.numeric(df_3_sample$employment_mode)
+df_3_sample$out = as.factor(df_3_sample$out)
+
+df_3_sample = df_3_sample %>% mutate_if(is.character, as.factor)
+df_3_sample = na.omit(df_3_sample)
+
+save(data = "df_3_sample", file = "df.rda")
+
+rf <- randomForest(out ~ ., data = df_3_sample)
+
+unilibrary(randomForest)
+library(vip)
+library(dplyr)
+
+vi_t <- vi_model(rf)
+vi_t$Importance <- round(vi_t$Importance, 2)
+vip(vi_t) + theme_classic()
+
+```
+
+**Целью данного исследования является изучение факторов, которые связаны с отказом в трудоустройстве** 
+Финальным продуктом будут являться рекомендации, разработанные для центров занятости, для выявления направлений работы с не трудоустроенными женщинами с целью улучшения их положения на рынке труда.
+
+# **Глава 2: безработица среди гендерных групп**
+
+Центр социологических исследований «Мониторинг общественного мнения» утверждает, что большинство руководителей крупных предприятий считают женщину менее надежным сотрудником. Среди наиболее часто встречающихся объяснений такого мнения можно выделить то, что женщины менее стабильны: как мы уже обсуждали, они могут в любой момент уйти в декретный отпуск, в отпуск по уходу за заболевшим ребенком или родственником.
+
+Здесь мы говорим о главных причинах, по которым женщинам отказывают в работе:
+* Из-за семьи и детей: из-за перехода в удаленный формат у населения появилась необходимость работать из дома (при лучшем раскладе), что становится затруднительным для людей, у которых есть маленькие дети. Уход за ними полностью перешел в обязанности родителей, особенно женщин, из-за закрытия детских садов и школ. (Alon et al., 2020)
+* У гораздо большего количества женщин, в сравнении с мужчинами, нет опыта работы. (Нью - Йорк: Организация Объединенных & Наций, 2005)
+В своем исследовании мы хотим сфокусироваться на людях, которые прошли переквалификацию по направлению центра занятости. Мы хотим посмотреть, на какие профессии смогли трудоустроиться мужчины и женщины после прохождения обучения, чтобы понять, есть ли разница в престижности их позиции. Для достижения этой цели мы посмотрели количество трудоустроенных респондентов, указавших место своей работы (см.График 5).
+
+<center>![](gr5.jpg)</center>
+
+```{r, fig.width = 15}
+
+women_w = nnwork %>%
+  filter(n > 15 & gender == "Женский") %>%
+  ggplot(aes(reorder(profession_last_work, n), n)) + 
+  geom_bar(stat="identity", width=.9, fill = "skyblue") + 
+ # geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..])), stat="count", position = position_stack(vjust = 0.5))+
+  labs(title="Самые распространенные профессии", 
+       subtitle="у женщин, прошедших переобучение",
+       x = NULL,
+       y = NULL) + 
+  ylim(0,500)+
+  theme_classic() +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle=45, vjust=0.6))
+
+men_w = nnwork %>%
+  filter(n > 15 & gender == "Мужской") %>%
+  ggplot(aes(reorder(profession_last_work, n), n)) + 
+  geom_bar(stat="identity", width=.9, fill = "skyblue") + 
+#  geom_text(aes(y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..])), stat="count", position = position_stack(vjust = 0.5))+
+  labs(title="Самые распространенные профессии", 
+       subtitle="у мужчин, прошедших переобучение",
+       x = NULL,
+       y = NULL) + 
+  theme_classic() +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle=45, vjust=0.6))
+library(ggpubr)
+plot3 = ggarrange(women_w, men_w, widths = c(10,10))
+
+options(scipen=9999999)
+
+# ggsave(plot3, file="plot3.jpg", width = 15)
+
+```
+
+Анализируя график, можно сделать выводы о том, что после переобучения индивиды занимают рабочие позиции на рынке труда. Следовательно, между ними нет значительной разницы по социально-экономическому статусу. Таким образом, фокус на респондентах, которые прошли курсы профессиональной подготовки, позволяет рассматривать гендерные группы как гомогенные с точки зрения социально-экономического статуса индивидов, что позволяет сравнивать их между собой.
+
+# **Глава 3: факторы, связанные с отказом в работе**
+
+Анализ изменений в тенденциях безработицы в России, вызванных эпидемий COVID-19 показал, что женщины чаще теряют работу и реже трудоустраиваются, по сравнению с мужчинами. Следующий шаг - это анализ влияния риск-факторов, которые считаются связанными с более частыми отказами в трудоустройстве. Базируясь на информации, полученной из вторичных источников, основная гипотеза последующего анализа может быть сформулирована следующим образом:
+* Принадлежность к женскому полу будет ассоциироваться с более низкими шансами успешного трудоустройства в период пандемии, в сравнении с принадлежностью к мужскому полу Кроме того, принимая во внимание стереотипные суждения, которыми чаще всего объясняется отказ в трудоустройстве работодателями, была сформулирована дополнительная гипотеза:
+* Принадлежность к категории лиц, испытывающим семейные трудности будет ассоциироваться с более низкими шансами успешного трудоустройства, в сравнении с категориями лиц, не испытывающими данные трудности. В данном случае, респондент, испытывающий семейные трудности, может быть описан одним или несколькими из представленных характеристик:
+  1. принимающий роль родителя в многодетной семье
+  2. являющийся единственным родителем
+  3. находящийся в разводе
+  
+Для того, чтобы дать точную оценку значимости фактора для объяснения вероятности трудоустройства, будет использована логистическая регрессия. Кроме того, для исследования различий факторов принятия или отказа в работе, следует учесть разницу между регионами с помощью использования разных типов двухуровневых моделей. Обоснование использования многоуровневых моделей заключается в том, что, когда индивидуальные наблюдения для отдельных респондентов “вложены” в группы или кластеры, можно ожидать, что два случайно выбранных человека из одной группы будут более похожи друг на друга, чем два человека, выбранных из разных групп. Модели были созданы с использованием методов прямого отбора, начиная с рандомизации результатов по группам, затем добавляя предикторы и, наконец, добавляя вариацию на индивидуальном уровне. Для сравнения соответствия модели используется информационный критерий Акаике, при этом меньшие значения указывают на лучшее качество модели.
+
+Переходя к анализу факторов принятия/отказа в трудоустройстве, стоит отметить, что согласно коэффициенту внутриклассовой корреляции, 17% различий в целевой переменной можно отнести к различиям на уровне регионов. Это означает, что принадлежность к региону может способствовать объяснению разницы между коэффициентами по индикаторам на индивидуальном уровне. Рассматривая средние значения по регионам относительно приема/отказа в работе, наиболее частыми отказами характеризуются республика Дагестан, Чеченская республика и Кабардино-Балкарская республика. Республика Крым, напротив, характеризуется более высокими средними значениями трудоустройства. Далее, в качестве независимой переменной мы добавляем переменную, учитывающую гендер респондента. Результаты показывают, что респонденты мужского пола имеют больше шансов быть принятыми на работу, в сравнении с респондентами женского пола (см. Таблицу 1).
+
+<center>![](tbl1.jpg)</center>
+
+Обращая внимание на уровень значимости (p), его значение ниже, чем 0.01. Это значит, что с вероятностью 99% результат не является случайным. Следовательно, основная гипотеза анализа является подтвержденной. Действительно, при прочих равных, гендерная принадлежность является важным фактором в объяснении целевой переменной - приема или отказа в трудоустройстве. Если респондент является мужчиной, вероятность того, что его примут на работу равна 55%. Если респондент является женщиной, вероятность того, что ее примут на работу равна 16%. 
+
+Для проверки второй гипотезы в модель вводятся предикторы один за одним. В результате, было создано еще четыре модели. Результат самой лучшей модели представлен ниже. Говоря о качестве финальной модели, стоит отметить, что для задачи предсказания, она верно определяет респондентов по группам трудоустроенных/не трудоустроенных в 82% случаев, что является высоким показателем точности модели (см.Таблицу 2).
+
+<center>![](tbl2.jpg)</center>
+
+Результаты финальной модели говорят о том, что статистически значимыми переменными для объяснения вариации в целевой переменной являются:
+
+* гендерная принадлежность
+* респондент является родителем в многодетной семье
+* респондент не работал ранее
+
+Стоит отметить, что принадлежность к категории “многодетные семьи” и “ранее не работавшие” снижают вероятность трудоустройства. В случае, если респондент принадлежит к одной из этих категорий, вероятность успеха составляет 47% и 33% соответственно. Таким образом, анализ показал, что гендерные различия играют действительно важную роль в определении успеха или неудачи в трудоустройстве. Для респондента-женщины процент трудоустройства будет ниже на 39%, сравнивая с респондентом-мужчиной. Что касается важности принадлежности к лицам, испытывающим семейные трудности, нужно в группе риска оказываются респонденты, которые принадлежат к многодетным семьям.
+
+# **Глава 4: факторы успешного трудоустройства для женщин**
+
+Предшествующий анализ подтвердил гипотезу о том, что принадлежность к женскому полу является фактором, который снижает шансы респондентов на трудоустройство. В ходе дальнейшего анализа мы хотим оценить факторы, которые связаны с успешными случаями трудоустройства среди женщин и проанализировать, как они могут изменить шансы на трудоустройство для женщин, которые не смогли получить работу за анализируемый промежуток времени.
+
+Прежде всего, необходимо выявить ключевые факторы, которые ассоциируются с успешным трудоустройством для женщин. Для этого был использован алгоритм “случайный лес”, который строит множество деревьев решений для решения задачи классификации - отнесения респондента к классу трудоустроенных или не трудоустроенных. В качестве независимых переменных для модели были выбраны те, которые характеризуют респондента с точки зрения его профессионализма. На основе данного алгоритма были выявлены переменные, которые оказались наиболее важными в процессе принятия решения классификатором (см. График 6).
+
+<center>![](gr6.jpg)</center>
+
+Очевидно, что самыми важными факторами, определяющими успешность трудоустройства, являются вид занятости (самый важный), средняя заработная плата на предыдущем месте работы, год выпуска из университета, опыт работы, уровень образования, ожидаемая заработная плата. Следующим шагом было построение байесовской сети (см.График 7). Если говорить о качестве данной модели, она с 99% точностью предсказывает успех/провал в трудоустройстве.
+
+```{r}
+
+fur1 = data_new %>%dplyr::select(gender, employment_type, education, salary_average, experience, year_graduation, expected_salary, profession_employment, month_employment, week_employment)
+
+fur1$gender = as.factor(fur1$gender)
+fur1$employment_type = as.factor(fur1$employment_type)
+fur1$education = as.factor(fur1$education)
+fur1$experience = as.numeric(as.character(fur1$experience))
+fur1$salary_average = as.numeric(as.character(fur1$salary_average))
+fur1$year_graduation = as.numeric(as.character(fur1$year_graduation))
+fur1$expected_salary = as.numeric(as.character(fur1$expected_salary))
+
+fur1 = fur1 %>%
+  mutate(out = case_when(fur1$profession_employment == "None" ~ 0,
+fur1$month_employment == "None" ~ 0,
+fur1$week_employment == "None" ~ 0,
+TRUE ~ 1))
+fur1$out=as.factor(fur1$out)
+fur1=fur1 %>% dplyr::select(- month_employment, -week_employment, -profession_employment)
+
+fur2 = na.omit(fur1)
+summary(fur2)
+
+fur2 = fur2 %>% dplyr::filter(gender=="Женский")
+
+fur2$salary = ifelse(fur2$salary_average < 11468, "<survival",
+                     ifelse(fur2$salary_average > 46674, ">Average", "Av-surv"))
+fur2$salary= as.factor(fur2$salary)
+
+fur2$exps = ifelse(fur2$expected_salary < 11468, "<survival",
+                     ifelse(fur2$expected_salary > 46674, ">Average", "Av-surv"))
+fur2$exps= as.factor(fur2$exps)
+
+fur2=fur2 %>% dplyr::select(-salary_average, -expected_salary)
+
+fur2$exper = ifelse(fur2$experience < 2, "junior", 
+                    ifelse(fur2$experience>5, "experienced", "middle"))
+fur2$exper = as.factor(fur2$exper)
+fur2=fur2 %>% dplyr::select(-experience, - gender)
+summary(fur2)
+
+library(bnlearn)
+bn_df1 <- data.frame(fur2)
+bnStructure1 = hc(bn_df1)
+
+library(Rgraphviz)
+graphviz.plot(bnStructure1, shape = "ellipse")
+
+set.seed(18)
+str.diff = boot.strength(bn_df1, R = 200, algorithm = "hc")
+str.diff1 = str.diff %>% arrange(desc(strength, direction))
+head(str.diff1)
+
+set.seed(18)
+attr(str.diff, "threshold")
+
+avg.diff = averaged.network(str.diff)
+
+strength.plot(avg.diff, str.diff, shape = "ellipse")
+
+plot(str.diff)
+abline(v = 0.7, col = "tomato", lty = 2, lwd = 2)
+abline(v = 0.99, col = "steelblue", lty = 2, lwd = 2)
+
+avg.simpler = averaged.network(str.diff, threshold = 0.99)
+
+strength.plot(avg.simpler, str.diff, shape = "ellipse")
+
+bn_df1=bn_df1 %>% dplyr::select(-year_graduation)
+
+bnStructure1 = hc(bn_df1)
+
+bnStructure1 = hc(bn_df1)
+bnStructure1 = drop.arc(bnStructure1, from = "exper", to = "employment_type")
+bnStructure1 = drop.arc(bnStructure1, from = "salary", to = "exper")
+bnStructure1 = drop.arc(bnStructure1, from = "exps", to = "education")
+bnStructure1 = set.arc(bnStructure1, from = "exper", to = "exps")
+bnStructure1 = set.arc(bnStructure1, from = "education", to = "exps")
+bnStructure1 = set.arc(bnStructure1, from = "exps", to = "out")
+
+graphviz.plot(bnStructure1, shape = "ellipse")
+
+```
+
+
+<center>![](gr7.jpg)</center>
+
+**Целевая переменная** - out - показывает, принят ли человек на работу. Далее, связи между переменными могут быть описаны следующим образом:
+
+* Employment_type -> out. Тип занятости влияет на успех/провал в трудоустройстве. В период пандемии безработица увеличилась для сезонных работников и для работников, которые работают по совмещению. Спрос на работу в удаленном формате, напротив, возрос.
+* Exps -> out. Ожидаемый уровень заработной платы влияет на успех трудоустройства. Из-за условий кризиса меньше денег стало выделяться на зарплаты и премии. Следовательно, можно предположить, что безработным респондентам с высокими зарплатными ожиданиями будут чаще отказывать в трудоустройстве.
+* education/salary/exper -> exps: Влияние уровня образования/средней предыдущей зарплаты/опыта работы на ожидаемую заработную плату. Чем выше уровень одного из показателей, тем более высокую заработную плату будет ожидать респондент. Изучая представленную модель, мы можем выделить факторы, по которым центры занятости могут дать рекомендации женщинам, составляющим заявку на поиск работы, чтобы помочь соискательницам увеличить свои шансы на трудоустройство. Данными факторами являются тип занятости и ожидаемая заработная плата. Чтобы проанализировать изменения шансов на трудоустройство, был использован “что если” анализ. Сначала была выявлена вероятность успеха для каждого значения, который может принимать фактор. Затем значения факторов, при которых вероятность успеха самая низкая, были заменены на значения факторов, при которых вероятность успеха была самая высокая. После этого изменения в вероятностях успеха можно проанализировать. Результаты оказались следующими:
+
+  1. Для женщин, которые ожидают заработную плату выше, чем среднюю по России (>46674 р.), вероятность успеха в трудоустройстве составляет 19%. При указании ожидаемой заработной платы между прожиточным минимумом и средней заработной платы, равно как и на уровне ниже прожиточного минимума, вероятность успеха составляет 20%. Следовательно, изменения этого фактора не приведет к значительным улучшениям.
+  2. Для женщин, которые хотят работать по совместительству, вероятность успеха в трудоустройстве составляет менее 1%. Если они вместо этого варианта рассмотрят возможность стажировки, то вероятность трудоустройства вырастет до 20%.
+  3. Для женщин, которые не указывают желаемый тип занятости, вероятность успеха в трудоустройстве составляет менее 1%. Если они с одинаковой вероятность укажут любой тип занятости, вероятность трудоустройства увеличится до 17%. Рекомендации
+
+В результате проделанного анализа были сформированы следующие рекомендации, которые могут помочь центрам занятости улучшить качество работы по трудоустройству граждан.
+
+  1. Следует сделать упор на формирование договоренностей с работодателями по трудоустройству лиц женского пола на предприятия. Мы считаем, что должен быть сделан акцент на гендерную принадлежность - иначе при прочих равных для трудоустройства выбирают мужчин.
+  2. Самое большое внимание и поддержку в процессе трудоустройства нужно оказать женщинам, у которых есть многодетная семья - в сравнении с остальными, у них меньше шансов на успешное трудоустройство.
+  3. Проследить за обязательным заполнением графы “Тип занятости” при составлении заявки женщинами.
+  4. Для женщин, которые хотят найти работу по совмещению, предложить рассмотреть вариант стажировок: многие из них являются оплачиваемыми и требуют 4-6 часов работы в день. Кроме того, прохождение стажировки подразумевает получение новых знаний и навыков, что впоследствии поможет найти более высокооплачиваемую работу.
+
+# **Ссылки на источники**
+
+  1. Alon, T., Doepke, M., Olmstead-Rumsey, J., & Tertilt, M. (2020). The Impact of COVID-19 on Gender Equality (No. w26947; p. w26947). National Bureau of Economic Research. https://doi.org/10.3386/w26947
+  2. Sullivan, O. (2019). Gender inequality in work-family balance. Nature Human Behaviour, 3(3), 201–203. https://doi.org/10.1038/s41562-019-0536-3
+  3. Нью - Йорк: Организация Объединенных, & Наций. (2005). Женская занятость: Глобальные тенденции и действия МОТ // Материалы МОТ, 49—Ая сессия Комиссии по положению женщин. 
+  4. "Обезличенные сведения об отдельных характеристиках получателей государственной услуги содействия гражданам в поиске подходящей работы, а работодателям в подборе необходимых работников". Источник: Роструд; обработка: Роструд, Инфраструктура научно-исследовательских данных, АНО «ЦПУР», 2020. (набор данных получен в рамках хакатона PandemicDataHack, 18-20 декабря 2020) 
+  5. "Обезличенные сведения об отдельных характеристиках граждан, обратившихся в электронной форме за пособием по безработице в период с 9 апреля по 31 октября 2020 года". Источник: Роструд; обработка: Роструд, Инфраструктура научно-исследовательских данных, АНО «ЦПУР», 2020. (набор данных получен в рамках хакатона PandemicDataHack, 18-20 декабря 2020) 
+  6. Почти 70% российских компаний пострадали из-за пандемии коронавируса. (б. д.). РБК. Извлечено 20 декабрь 2020 г., от https://www.rbc.ru/economics/28/05/2020/5ecf711b9a7947324d1448cf
+  7. Росстат назвал соотношение числа мужчин и женщин в России. (20200422T0645). РИА Новости. https://ria.ru/20200422/1570386332.html
+  8. Уполномоченный при Президенте РФ по защите прав предпринимателей. Доклад Президенту РФ — 2020. (б. д.). Извлечено 20 декабрь 2020 г., от http://doklad.ombudsmanbiz.ru/doklad_2020.html
